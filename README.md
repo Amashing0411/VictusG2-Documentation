@@ -1,7 +1,10 @@
 # ☁️ VictusG2 Cloud Drive
-An Industry-Standard, Full-Stack Persistent Cloud Storage Platform built for secure file management.
 
-[url=https://postimg.cc/mPxzyf0W][img]https://i.postimg.cc/mPxzyf0W/github-header-banner.png[/img][/url]
+<a href="https://postimg.cc/mPxzyf0W" target="_blank">
+  <img src="https://i.postimg.cc/mPxzyf0W/github-header-banner.png" alt="github-header-banner">
+</a>
+
+An Industry-Standard, Full-Stack Persistent Cloud Storage Platform built for secure file management.
 
 ## 🚀 Overview
 VictusG2 is a persistent FTP/Cloud Drive hybrid. Unlike standard PaaS deployments (Render/Railway) which use ephemeral containers that delete user files on restart, VictusG2 is deployed on a dedicated **Ubuntu 24.04 LTS Virtual Machine**. This ensures true persistent local storage, strict 1GB user quotas, and real-time Linux server monitoring.
