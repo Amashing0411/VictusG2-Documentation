@@ -61,7 +61,7 @@ It is deployed on a dedicated **Ubuntu 24.04 LTS Virtual Machine** via DigitalOc
 ---
 
 ## 👨‍💻 Project Development
-This project was solo-developed by **Mark James Alcantara** (Group 2). 
+This project was developed by **Mark James Alcantara** (Group 2). 
 
 **Key Contributions:**
 * **Frontend:** Designed and built the entire React user interface, including the Google Drive-style file manager, Light/Dark mode toggles, and Framer Motion animations.
