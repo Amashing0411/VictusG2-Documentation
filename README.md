@@ -1,7 +1,7 @@
 # ☁️ VictusG2 Cloud Drive
 
 <a href="https://postimg.cc/mPxzyf0W" target="_blank">
-  <img src="https://i.postimg.cc/mPxzyf0W/github-header-banner.png" 
+  <img src="ttps://i.postimg.cc/mPxzyf0W/github-header-banner.png" 
        alt="github-header-banner" 
        width="100%">
 </a>
