@@ -1,7 +1,9 @@
 # ☁️ VictusG2 Cloud Drive
 
 <a href="https://postimg.cc/mPxzyf0W" target="_blank">
-  <img src="https://i.postimg.cc/mPxzyf0W/github-header-banner.png" alt="github-header-banner">
+  <img src="https://i.postimg.cc/mPxzyf0W/github-header-banner.png" 
+       alt="github-header-banner" 
+       width="100%">
 </a>
 
 An Industry-Standard, Full-Stack Persistent Cloud Storage Platform built for secure file management.
