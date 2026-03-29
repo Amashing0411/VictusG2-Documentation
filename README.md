@@ -63,19 +63,19 @@ It is deployed on a dedicated **Ubuntu 24.04 LTS Virtual Machine** via DigitalOc
 ## 👨‍💻 Project Development
 This project was developed by **(Group 2)**. 
 
-**Mark James Alcantara**
+**Mark James Alcantara's**
 **Key Contributions:**
 * **Frontend:** Designed and built the entire React user interface, including the Google Drive-style file manager, Light/Dark mode toggles, and Framer Motion animations.
 * **Backend:** Wrote the Node.js/Express server to handle physical file uploads (`multer`), enforce the 1GB quota, and block malicious file types.
 * **Database:** Configured Supabase Auth and wrote the PostgreSQL triggers and RPC functions to sync user data.
 * **Deployment:** Spun up the DigitalOcean Ubuntu Virtual Machine, configured the Nginx reverse proxy, generated the SSL certificates, and managed the Git CI/CD pipeline to push the code live.
 
-***************(To be paid.)
-***************(To be paid.)
-***************(To be paid.)
-***************(To be paid.)
-***************(To be paid.)
-***************(To be paid.)
+***************(To be paid).
+***************(To be paid).
+***************(To be paid).
+***************(To be paid).
+***************(To be paid).
+***************(To be paid).
 
 ---
 
