@@ -70,13 +70,6 @@ This project was developed by **(Group 2)**.
 * **Database:** Configured Supabase Auth and wrote the PostgreSQL triggers and RPC functions to sync user data.
 * **Deployment:** Spun up the DigitalOcean Ubuntu Virtual Machine, configured the Nginx reverse proxy, generated the SSL certificates, and managed the Git CI/CD pipeline to push the code live.
 
-***************(To be paid).
-***************(To be paid).
-***************(To be paid).
-***************(To be paid).
-***************(To be paid).
-***************(To be paid).
-
 ---
 
 ## 🗺️ V2.0 Future Roadmap
