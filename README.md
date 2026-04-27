@@ -1,82 +1,110 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/Amashing0411/VictusG2-Documentation/main/github-header-banner.png" alt="VictusG2 Cloud Banner" width="100%" />
-
   <br />
 
-  # ☁️ VictusG2 Cloud Drive
-  **An Industry-Standard, Full-Stack Persistent Cloud Storage Platform.**
-  
-  [![Live Demo](https://img.shields.io/badge/Live_Demo-victusg2.me-0ea5e9?style=for-the-badge&logo=google-cloud)](https://victusg2.me)
-  [![Status](https://img.shields.io/badge/Status-Production-success?style=for-the-badge)](#)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+# ☁️ VictusG2 Cloud Drive  
+**A full-stack cloud storage platform with persistent server-side storage.**
 
-  *Engineered for secure, high-performance file management with dedicated Linux persistent storage.*
+[![Live Demo](https://img.shields.io/badge/Live_Demo-victusg2.me-0ea5e9?style=for-the-badge&logo=google-cloud)](https://victusg2.me)
+[![Status](https://img.shields.io/badge/Status-Production-success?style=for-the-badge)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+
 </div>
 
 ---
 
-## 🚀 The Architecture
-Unlike standard student projects deployed on ephemeral PaaS containers (Render/Railway/Heroku) which permanently delete user files on server restarts, **VictusG2** is architected as a true persistent cloud drive. 
+## 🚀 Architecture
 
-It is deployed on a dedicated **Ubuntu 24.04 LTS Virtual Machine** via DigitalOcean. This ensures true physical local storage (`/var/www/uploads`), strict 1GB user quotas tracked dynamically at the database level, and real-time Linux server hardware monitoring.
+Unlike typical student projects deployed on ephemeral platforms (e.g., Render, Railway, Heroku) where uploaded files are lost on restart, **VictusG2** is built around persistent storage.
+
+The system runs on a dedicated **Ubuntu 24.04 LTS virtual machine** hosted on DigitalOcean. Files are stored directly on the server’s disk (`/var/www/uploads`), with user quotas enforced at the database level. This ensures consistent data retention, improved reliability, and full control over system resources.
 
 ---
 
 ## ✨ Features
 
 ### 🛡️ Security & Authentication
-* **Supabase Auth:** Secure Email Sign-up, JWT Login, and automated HTML Password Reset emails.
-* **Row Level Security (RLS):** Strict PostgreSQL database policies ensure users can *only* access their own metadata.
-* **Anti-Malware File Filter:** Node.js Multer middleware strictly rejects executable files (`.exe`, `.sh`, `.bat`) to prevent server injection attacks.
-* **Nginx Reverse Proxy:** All API traffic is securely routed and encrypted via Let's Encrypt SSL (`https://`).
+- Supabase Auth (email authentication and JWT-based sessions)  
+- Row Level Security (RLS) for strict user-level data isolation  
+- File validation using Multer to block executable uploads (`.exe`, `.sh`, `.bat`)  
+- Nginx reverse proxy with HTTPS (Let’s Encrypt SSL)  
 
-### 📂 Cloud Storage Engine
-* **Persistent Storage:** Files are written in chunks directly to the Ubuntu server's physical SSD.
-* **Cinematic Media Engine:** PDFs and MP4 Videos open dynamically in a sleek, in-browser theater modal without requiring a download.
-* **Drag-and-Drop Dropzone:** Smart UI that detects file hovers and instantly uploads via FormData.
-* **Real-Time Filtering:** Client-side React state dynamically filters files by name instantly as the user types.
+### 📂 Storage System
+- Persistent file storage on the server’s SSD  
+- In-browser preview for PDFs and MP4 files  
+- Drag-and-drop upload interface using FormData  
+- Real-time client-side file filtering  
 
-### 👑 Admin Console
-* **Live Telemetry:** Tracks the actual Ubuntu Server's CPU, RAM, and Disk Space in real-time.
-* **User Moderation:** Admins can promote/demote users, or utilize the "Ban & Wipe" feature which recursively deletes a user's physical folder from the Linux hard drive (`fs.rmSync`).
-* **Global Oversight:** Admins can filter the global file table by owner and forcefully delete any file violating TOS.
+### 👑 Admin Tools
+- Live server telemetry (CPU, RAM, disk usage)  
+- User role management (promotion, demotion, ban & wipe)  
+- Global file monitoring and forced deletion system  
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend (Client)
-* **Framework:** React.js (Vite for speed and optimized builds)
-* **Styling:** Tailwind CSS (Fully responsive with `localStorage` Light/Dark mode toggles)
-* **Animation:** Framer Motion (Pop-layouts, presence detection, modal scaling)
-* **UX/UI:** React Hot Toast (Notifications), Lucide React (Icons)
+### Frontend
+- React.js (Vite)  
+- Tailwind CSS  
+- Framer Motion  
+- React Hot Toast, Lucide Icons  
 
-### Backend (API & Infrastructure)
-* **Server:** Node.js with Express.js
-* **File Handling:** Multer (DiskStorage Engine)
-* **Security:** Helmet (HTTP Headers), CORS (Cross-Origin Resource Sharing)
-* **Database & BaaS:** Supabase (PostgreSQL with custom SQL Triggers & RPC Functions)
-* **Deployment:** Ubuntu LTS 24.04, Nginx, Certbot (SSL), PM2 (Process Manager), Git CI/CD
+### Backend & Infrastructure
+- Node.js, Express.js  
+- Multer (file handling middleware)  
+- Supabase (PostgreSQL, Auth, RLS)  
+- Nginx, PM2, Certbot  
+- Ubuntu 24.04 (DigitalOcean VM)  
 
 ---
 
 ## 👨‍💻 Project Development
-This project was developed by **(Group 2)**. 
 
-**Mark James Alcantara's**
-**Key Contributions:**
-* **Frontend:** Designed and built the entire React user interface, including the Google Drive-style file manager, Light/Dark mode toggles, and Framer Motion animations.
-* **Backend:** Wrote the Node.js/Express server to handle physical file uploads (`multer`), enforce the 1GB quota, and block malicious file types.
-* **Database:** Configured Supabase Auth and wrote the PostgreSQL triggers and RPC functions to sync user data.
-* **Deployment:** Spun up the DigitalOcean Ubuntu Virtual Machine, configured the Nginx reverse proxy, generated the SSL certificates, and managed the Git CI/CD pipeline to push the code live.
+Developed by **Group 2**.
+
+### Mark James Alcantara
+- Led the overall system architecture and full-stack development  
+- Designed and implemented the complete React-based user interface, including file management workflows and UI state handling  
+- Developed the backend API using Node.js and Express, handling file uploads, validation, and quota enforcement  
+- Integrated Supabase authentication and configured PostgreSQL with custom triggers and RPC functions for data consistency  
+- Deployed the system on a DigitalOcean Ubuntu VM, including Nginx reverse proxy configuration, SSL setup, and process management via PM2  
+- Established CI/CD workflow for automated deployment and updates  
+
+### Brylle Edward A. Ramos
+- Provided technical support in debugging both frontend and backend issues  
+- Assisted in identifying deployment-related errors and stability improvements during production setup  
+- Contributed to testing and validation of system functionality under different scenarios  
+
+### Myka Ella A. Dalit
+- Led the initial setup and configuration of the Linux virtual machine environment  
+- Handled provisioning and baseline system configuration on DigitalOcean  
+- Ensured proper server environment preparation for backend deployment and storage operations  
+
+### Alleny P. Hernandez
+- Managed project-related service expenses and resource allocation  
+- Secured access to the GitHub Student Developer Pack, enabling the use of cloud and development tools  
+- Supported logistical and operational requirements necessary for system deployment  
+
+### Arwin E. Eser Jose
+- Assisted in backend development, particularly in API logic and request handling  
+- Contributed to implementation and refinement of server-side features  
+- Supported debugging and optimization of backend processes  
+
+### Daniel Sotalbo
+- Assisted in frontend development and UI implementation  
+- Contributed to component structuring and interface improvements  
+- Supported testing and refinement of user-facing features  
 
 ---
 
-## 🗺️ V2.0 Future Roadmap
-While the current MVP focuses on core infrastructure and persistent storage, the following features are architected for the next major release:
-* **Multi-Factor Authentication (MFA):** Integration with TOTP apps (Google Authenticator/Authy) via Supabase Auth Assurance Levels (AAL2).
-* **Public File Sharing:** Generate expiring, cryptographically secure public URLs for specific files.
-* **Nested Directories:** Allowing users to create and manage virtual folders within their root directory.
+## 🗺️ Roadmap (v2.0)
+
+Planned improvements:
+- Multi-Factor Authentication (TOTP-based)  
+- Public file sharing with expiring secure links  
+- Support for nested directories  
 
 ---
-*Built with ❤️ for secure cloud storage.*
+
+*Built for practical and reliable cloud storage deployment.*
