@@ -86,7 +86,7 @@ Developed by **Group 2**.
 - Secured access to the GitHub Student Developer Pack, enabling the use of cloud and development tools  
 - Supported logistical and operational requirements necessary for system deployment  
 
-### Arwin E. Eser Jose
+### Arwin E. Eser Jose & John Rei R. Tolentino 
 - Assisted in backend development, particularly in API logic and request handling  
 - Contributed to implementation and refinement of server-side features  
 - Supported debugging and optimization of backend processes  
