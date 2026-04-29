@@ -92,7 +92,6 @@ Developed by **Group 2**.
 - Supported debugging and optimization of backend processes  
 
 ### Daniel Sotalbo
-- Assisted in frontend development and UI implementation  
 - Contributed to component structuring and interface improvements  
 - Supported testing and refinement of user-facing features  
 
