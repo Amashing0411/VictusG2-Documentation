@@ -82,7 +82,7 @@ Developed by **Group 2**.
 - Ensured proper server environment preparation for backend deployment and storage operations  
 
 ### Alleny P. Hernandez
-- Managed project-related service expenses and resource allocation  
+- Managed project-related service expenses and resource allocation 
 - Secured access to the GitHub Student Developer Pack, enabling the use of cloud and development tools  
 - Supported logistical and operational requirements necessary for system deployment  
 
