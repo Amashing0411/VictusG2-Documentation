@@ -77,9 +77,9 @@ Developed by **Group 2**.
 - Contributed to testing and validation of system functionality under different scenarios  
 
 ### Myka Ella A. Dalit
-- Led the initial setup and configuration of the Linux virtual machine environment  
+- Led the initial setup and configuration of the Linux virtual machine environment
+- Contributed in frontend coding
 - Handled provisioning and baseline system configuration on DigitalOcean  
-- Ensured proper server environment preparation for backend deployment and storage operations  
 
 ### Alleny P. Hernandez
 - Managed project-related service expenses and resource allocation 
