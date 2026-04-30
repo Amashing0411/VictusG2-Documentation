@@ -15,9 +15,9 @@
 
 ## 🚀 Architecture
 
-Unlike typical student projects deployed on ephemeral platforms (e.g., Render, Railway, Heroku) where uploaded files are lost on restart, **VictusG2** is built around persistent storage.
+The architecture of VictusG2 is defined by a transition from ephemeral, containerized environments to a stateful, self-managed infrastructure. By leveraging a dedicated Ubuntu 24.04 LTS virtual machine on DigitalOcean, the system establishes a stable compute layer that avoids the volatile filesystem resets common in platforms like Heroku or Render. This foundation allows the application to utilize the server’s local disk as a permanent storage repository, specifically within the /var/www/uploads directory. Unlike cloud-native storage solutions that often require complex external integrations, this direct-to-disk approach ensures that data persists across deployments and system reboots, providing a reliable environment for long-term file management.
 
-The system runs on a dedicated **Ubuntu 24.04 LTS virtual machine** hosted on DigitalOcean. Files are stored directly on the server’s disk (`/var/www/uploads`), with user quotas enforced at the database level. This ensures consistent data retention, improved reliability, and full control over system resources.
+To maintain system integrity and prevent resource exhaustion, the architecture incorporates a logical enforcement layer at the database level. Instead of relying on rigid operating system partitions, the application logic queries the database to track and validate user storage quotas in real-time before any write operations occur. This creates a coordinated workflow where the database manages metadata and permissions while the filesystem handles the raw binary data. This hybrid design grants the developer total control over the environment, from fine-tuning the underlying Linux kernel to scaling resources vertically, resulting in a more predictable and cost-effective system compared to traditional PaaS offerings.
 
 ---
 
