@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Amashing0411/VictusG2-Documentation/main/github-header-banner.png" width="100%" />
+  <img src="https://raw.githubusercontent.com/Amashing0411/VictusG2-Documentation/main/github-header-banner.png" alt="VictusG2 Cloud Banner" width="100%" />
 </p>
 
 <h1 align="center">☁️ VictusG2 Cloud Drive</h1>
@@ -13,7 +13,9 @@
     <img src="https://img.shields.io/badge/Live_Demo-victusg2.me-0ea5e9?style=for-the-badge&logo=google-cloud" />
   </a>
   <img src="https://img.shields.io/badge/Status-Production-success?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" />
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" />
+  </a>
 </p>
 
 ---
@@ -24,71 +26,80 @@
 3. [Technology Stack](#️-technology-stack)
 4. [Project Structure](#-project-structure)
 5. [Local Development Guide](#️-local-development-guide)
-6. [Production Deployment](#-production-deployment-vpsubuntu)
+   - [Prerequisites](#1-prerequisites)
+   - [Database Configuration](#2-database-configuration-supabase)
+   - [Environment Variables](#3-environment-variables)
+   - [Running the Application](#4-running-the-application)
+6. [Production Deployment (VPS/Ubuntu)](#-production-deployment-vpsubuntu)
 7. [Team & Contributions](#-team--contributions)
-8. [Roadmap](#️-roadmap-v20)
+8. [Roadmap (v2.0)](#️-roadmap-v20)
 9. [License](#-license)
 
 ---
 
 ## 🚀 System Architecture
 
-The architecture of VictusG2 is defined by a transition from ephemeral, containerized environments to a stateful, self-managed infrastructure.
+The architecture of VictusG2 is defined by a transition from ephemeral, containerized environments to a stateful, self-managed infrastructure. By leveraging a dedicated Ubuntu 24.04 LTS virtual machine on DigitalOcean, the system establishes a stable compute layer that avoids the volatile filesystem resets common in platforms like Heroku or Render. This foundation allows the application to utilize the server’s local disk as a permanent storage repository, specifically within the `/var/www/uploads` directory. Unlike cloud-native storage solutions that often require complex external integrations, this direct-to-disk approach ensures that data persists across deployments and system reboots, providing a reliable environment for long-term file management.
 
-A dedicated Ubuntu 24.04 LTS VM ensures persistent storage using:
-
-```
-/var/www/uploads
-```
-
-This avoids filesystem resets from platforms like Heroku or Render.
-
-A hybrid system is used:
-- Database → metadata, permissions, quotas  
-- Filesystem → raw binary storage  
-
-This enables predictable scaling and full system control.
+To maintain system integrity and prevent resource exhaustion, the architecture incorporates a logical enforcement layer at the database level. Instead of relying on rigid operating system partitions, the application logic queries the database to track and validate user storage quotas in real-time before any write operations occur. This creates a coordinated workflow where the database manages metadata and permissions while the filesystem handles the raw binary data. This hybrid design grants the developer total control over the environment, from fine-tuning the underlying Linux kernel to scaling resources vertically, resulting in a more predictable and cost-effective system compared to traditional PaaS offerings.
 
 ---
 
 ## ✨ Core Features
 
 ### 🛡️ Security & Authentication
-- Supabase Auth (JWT sessions)
-- Row Level Security (RLS)
-- File validation via Multer
-- Nginx + SSL (Let's Encrypt)
+- Supabase Auth Integration: Secure email/password authentication generating stateless JWT sessions.
+- Row Level Security (RLS): Cryptographic database-level isolation ensuring users can only query their own files.
+- Strict File Validation: Express middleware utilizing Multer to intercept, inspect, and block executable payloads (`.exe`, `.sh`, `.bat`, `.msi`) before they touch the disk.
+- Secure Infrastructure: Nginx reverse proxy configured with Let’s Encrypt SSL/TLS encryption.
 
 ### 📂 Storage & Media System
-- Persistent SSD storage
-- In-browser streaming (MP4, PDFs, images)
-- Drag-and-drop uploads
-- Real-time indexing
+- Persistent SSD Storage: Direct-to-disk binary storage bypassing the need for expensive S3 buckets.
+- Cinematic Media Engine: Custom React components allowing in-browser streaming of MP4s, PDFs, and high-res images without forcing downloads.
+- Smart Drag-and-Drop: Asynchronous file uploads using FormData APIs and Framer Motion animations.
+- Real-Time Indexing: Instant client-side state filtering without synchronous page reloads.
 
-### 👑 Admin Console
-- System telemetry (CPU, RAM, Disk)
-- RBAC via JWT claims
-- Global moderation tools
+### 👑 God-Mode Admin Console
+- Kernel-Level Telemetry: WebSockets/Polling fetching CPU load, RAM usage, and disk space via `systeminformation`.
+- RBAC (Role-Based Access Control): UI elements dynamically render based on JWT admin claims.
+- Global Moderation: Ability to view files, promote users, or execute recursive file wipes.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Domain | Technology |
-|--------|----------|
-| Frontend | React (Vite), Tailwind, Framer Motion |
-| Backend | Node.js, Express, Multer |
-| Database | Supabase (PostgreSQL), JWT |
-| Infra | Ubuntu, Nginx, PM2 |
+| Domain | Technology Used |
+| :--- | :--- |
+| Frontend | React.js (Vite), Tailwind CSS, Framer Motion, React Dropzone, Lucide Icons |
+| Backend API | Node.js, Express.js, Multer, Helmet.js, CORS |
+| Database & Auth | Supabase (PostgreSQL), JWT, Custom SQL Triggers |
+| Infrastructure | DigitalOcean Droplet (Ubuntu 24.04 LTS), Nginx, PM2, Certbot (SSL) |
 
 ---
 
 ## 📁 Project Structure
 
-```
+```bash
 VictusG2-Documentation/
-├── frontend/
-├── backend/
+├── frontend/                  # React.js Client Application
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── context/
+│   │   ├── utils/
+│   │   └── App.jsx
+│   ├── package.json
+│   └── vite.config.js
+│
+├── backend/                   # Node.js/Express API Server
+│   ├── controllers/
+│   ├── middleware/
+│   ├── routes/
+│   ├── server.js
+│   ├── package.json
+│   └── uploads/               # Ignored in Git
+│
 └── README.md
 ```
 
@@ -97,49 +108,58 @@ VictusG2-Documentation/
 ## ⚙️ Local Development Guide
 
 ### 1. Prerequisites
-- Node.js (v18+)
+- Node.js (v18.x or higher)
 - Git
 - Supabase account
 
 ---
 
-### 2. Database Setup
+### 2. Database Configuration (Supabase)
 
 ```sql
 CREATE TABLE profiles (
-  id UUID REFERENCES auth.users PRIMARY KEY,
+  id UUID REFERENCES auth.users NOT NULL PRIMARY KEY,
   email TEXT,
   role TEXT DEFAULT 'user',
   storage_used BIGINT DEFAULT 0
 );
 ```
 
-Enable RLS after creation.
+Enable Row Level Security (RLS) after creating the table.
 
 ---
 
 ### 3. Environment Variables
 
-**Frontend (.env)**
+Clone the repository:
+
+```bash
+git clone https://github.com/Amashing0411/VictusG2-Documentation.git
+cd VictusG2-Documentation
+```
+
+Create `.env` files in both directories.
+
+**Frontend (`frontend/.env`)**
 ```env
-VITE_SUPABASE_URL=your_url
-VITE_SUPABASE_ANON_KEY=your_key
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
-**Backend (.env)**
+**Backend (`backend/.env`)**
 ```env
 PORT=5000
-SUPABASE_URL=your_url
-SUPABASE_SERVICE_KEY=your_key
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 UPLOAD_DIR=./uploads
 ```
 
 ---
 
-### 4. Run the App
+### 4. Running the Application
 
-**Backend**
+**Backend Server**
 ```bash
 cd backend
 npm install
@@ -147,14 +167,14 @@ mkdir uploads
 npm start
 ```
 
-**Frontend**
+**Frontend Client**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-App runs at:
+Application runs at:
 ```
 http://localhost:5173
 ```
@@ -163,7 +183,8 @@ http://localhost:5173
 
 ## 🌍 Production Deployment (VPS/Ubuntu)
 
-### Install Dependencies
+### 1. Server Initialization
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install nodejs npm git nginx -y
@@ -172,37 +193,35 @@ sudo npm install -g pm2
 
 ---
 
-### Clone Project
+### 2. Clone and Build
+
 ```bash
 cd /var/www
-git clone https://github.com/Amashing0411/VictusG2-Documentation.git
-```
-
----
-
-### Build Frontend
-```bash
-cd frontend
+git clone https://github.com/Amashing0411/VictusG2-Documentation.git victusg2
+cd victusg2/frontend
 npm install
 npm run build
 ```
 
 ---
 
-### Start Backend
+### 3. Start Node.js Daemon
+
 ```bash
 cd ../backend
 npm install
 pm2 start server.js --name victus-api
 pm2 save
+pm2 startup
 ```
 
 ---
 
-### Nginx Config
+### 4. Nginx Reverse Proxy Configuration
+
 ```nginx
 server {
-    server_name victusg2.me;
+    server_name victusg2.me www.victusg2.me;
 
     location / {
         root /var/www/victusg2/frontend/dist;
@@ -212,38 +231,51 @@ server {
 
     location /api/ {
         proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         client_max_body_size 1024M;
     }
 }
+```
+
+Enable and secure:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/victusg2 /etc/nginx/sites-enabled/
+sudo systemctl restart nginx
+sudo snap install --classic certbot
+sudo certbot --nginx -d victusg2.me -d www.victusg2.me
 ```
 
 ---
 
 ## 👨‍💻 Team & Contributions
 
-| Member | Role |
-|-------|------|
-| Mark James Alcantara | Full-Stack / Architect |
-| Alleny P. Hernandez | Project Manager |
-| Myka Ella A. Dalit | Infrastructure |
-| Arwin E. Eser Jose | Backend |
-| John Rei R. Tolentino | Backend |
-| Daniel Sotalbo | Frontend |
-| Brylle Edward A. Ramos | QA |
+Developed and maintained by **Group 2**.
+
+| Team Member | Role & Contributions |
+| :--- | :--- |
+| Mark James Alcantara | Lead Architect / Full-Stack: System architecture design, React frontend, Node.js API, Multer validation, Supabase integration, Nginx/SSL deployment, CI/CD |
+| Alleny P. Hernandez | Project Manager: Resource allocation, service expense management |
+| Myka Ella A. Dalit | Infrastructure / Frontend: Ubuntu VM setup, environment configuration |
+| Arwin E. Eser Jose | Backend Developer: API routing, validation, debugging |
+| John Rei R. Tolentino | Backend Developer: Supabase configuration, quota logic |
+| Daniel Sotalbo | Frontend Developer: UI/UX refinement |
+| Brylle Edward A. Ramos | QA & Tech Support: Testing, debugging, deployment support |
 
 ---
 
 ## 🗺️ Roadmap (v2.0)
 
-- MFA (TOTP)
-- File sharing links
-- Folder system
+- TOTP Multi-Factor Authentication
+- Secure File Sharing with expiration links
+- Nested directory system
 
 ---
 
 ## 📜 License
 
-MIT License
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
 
 ---
 
