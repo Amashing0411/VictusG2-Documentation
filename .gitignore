@@ -1,5 +1,30 @@
+<<<<<<< HEAD
 node_modules/
 .env
 .env.*
 backend/uploads/
 frontend/dist/
+=======
+# Node
+node_modules/
+npm-debug.log
+
+# Env
+.env
+.env.*
+
+# Build
+dist/
+build/
+
+# Uploads
+backend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+>>>>>>> 38b2cd80ee1eb627b69d2538b35661b651350f7a
