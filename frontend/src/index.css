@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* We use @apply so Tailwind handles the Light/Dark transition automatically! */
+body {
+  @apply bg-gray-50 dark:bg-victus-dark text-gray-900 dark:text-white transition-colors duration-300;
+}
+
+/* --- GITHUB HEATMAP OVERRIDES --- */
+.react-calendar-heatmap text {
+  font-size: 10px;
+  fill: #64748b; /* Tailwind gray-500 */
+}
+.dark .react-calendar-heatmap text {
+  fill: #94a3b8; /* Tailwind gray-400 */
+}
+
+.react-calendar-heatmap .color-empty {
+  fill: #f1f5f9; /* Light mode empty */
+  rx: 2; ry: 2; /* Rounded corners */
+}
+.dark .react-calendar-heatmap .color-empty {
+  fill: #1e293b; /* Dark mode empty */
+}
+
+/* The Green Scale (Matches GitHub exactly) */
+.react-calendar-heatmap .color-scale-1 { fill: #0e4429; rx: 2; ry: 2; }
+.react-calendar-heatmap .color-scale-2 { fill: #006d32; rx: 2; ry: 2; }
+.react-calendar-heatmap .color-scale-3 { fill: #26a641; rx: 2; ry: 2; }
+.react-calendar-heatmap .color-scale-4 { fill: #39d353; rx: 2; ry: 2; }
+
+/* In Light Mode, we use slightly different greens to match GitHub Light */
+.react-calendar-heatmap .color-scale-1 { fill: #9be9a8; }
+.dark .react-calendar-heatmap .color-scale-1 { fill: #0e4429; }
+.react-calendar-heatmap .color-scale-2 { fill: #40c463; }
+.dark .react-calendar-heatmap .color-scale-2 { fill: #006d32; }
+.react-calendar-heatmap .color-scale-3 { fill: #30a14e; }
+.dark .react-calendar-heatmap .color-scale-3 { fill: #26a641; }
+.react-calendar-heatmap .color-scale-4 { fill: #216e39; }
+.dark .react-calendar-heatmap .color-scale-4 { fill: #39d353; }
+
+.react-calendar-heatmap rect:hover {
+  stroke: #fff;
+  stroke-width: 1px;
+}
+.dark .react-calendar-heatmap rect:hover {
+  stroke: #000;
+}
