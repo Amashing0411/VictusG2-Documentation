@@ -72,7 +72,7 @@ Developed by **Group 2**.
 - Established CI/CD workflow for automated deployment and updates  
 
 ### Brylle Edward A. Ramos
-- Provided technical support in debugging both frontend and backend issues  
+- Provided assitance in project-related service expenses and resource allocation  
 - Assisted in identifying deployment-related errors and stability improvements during production setup  
 - Contributed to testing and validation of system functionality under different scenarios  
 
