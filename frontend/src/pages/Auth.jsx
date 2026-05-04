@@ -215,15 +215,23 @@ export default function Auth() {
             </div>
           )}
 
-          {/* 🛡️ CLOUDFLARE TURNSTILE WIDGET */}
+          {/* 🛡️ CLOUDFLARE TURNSTILE WIDGET (Bypassed in Dev Mode) */}
           {mode !== 'update_password' && (
             <div className="flex justify-center my-4">
-              <Turnstile 
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY} 
-                onSuccess={(token) => setCaptchaToken(token)}
-                onError={() => toast.error("Captcha failed. Please try again.")}
-                options={{ theme: 'auto' }}
-              />
+              {import.meta.env.DEV ? (
+                <div className="bg-green-500/10 text-green-500 border border-green-500/20 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" /> Dev Mode: Captcha Bypassed
+                  {/* Automatically set a fake token so the button unlocks! */}
+                  {setTimeout(() => setCaptchaToken('dev-bypass-token'), 100)}
+                </div>
+              ) : (
+                <Turnstile 
+                  siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY} 
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onError={() => toast.error("Captcha failed. Please try again.")}
+                  options={{ theme: 'auto' }}
+                />
+              )}
             </div>
           )}
 

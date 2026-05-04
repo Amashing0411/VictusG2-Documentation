@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
+const NodeClam = require('clamscan'); // <-- ADD THIS
 const fs = require('fs');
 const path = require('path');
 const si = require('systeminformation');
@@ -66,6 +67,36 @@ const storage = multer.diskStorage({
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, uniqueSuffix + '-' + file.originalname);
     }
+});
+
+// --- CLAMAV ANTI-VIRUS ENGINE INITIALIZATION ---
+let clamscan;
+new NodeClam().init({
+    removeInfected: true, // Automatically delete infected files
+    quarantineInfected: false,
+    scanLog: null,
+    debugMode: false,
+    fileList: null,
+    scanRecursively: true,
+    clamdscan: {
+        socket: '/var/run/clamav/clamd.ctl',
+        host: '127.0.0.1',
+        port: 3310,
+        timeout: 60000,
+        localFallback: true,
+        path: '/usr/bin/clamdscan',
+        configFile: null,
+        multiscan: true,
+        reloadDb: false,
+        active: true,
+        bypassTest: false,
+    },
+    preference: 'clamdscan' // Use the fast background daemon we just installed
+}).then(instance => {
+    clamscan = instance;
+    console.log("🛡️ ClamAV Engine Initialized Successfully.");
+}).catch(err => {
+    console.error("⚠️ ClamAV Failed to Initialize:", err.message);
 });
 
 // --- ANTI-MALWARE FILE FILTER ---
@@ -145,31 +176,58 @@ app.post('/api/upload', (req, res) => {
             return res.status(400).json({ error: "File and User ID are required." });
         }
 
-        // 1. Check user's current storage used in Supabase
+        // 🛡️ INITIATE CLAMAV DEEP SCAN
+        if (clamscan) {
+            try {
+                const { isInfected, viruses } = await clamscan.isInfected(file.path);
+                if (isInfected) {
+                    // Forcefully delete the file (just in case the daemon didn't)
+                    if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                    
+                    // Log the massive security violation!
+                    logAudit(userId, 'MALWARE_BLOCKED', `Anti-Virus triggered! Threat: ${viruses.join(', ')}`, req);
+                    
+                    return res.status(403).json({ error: `Malware Detected! File deleted. Threat: ${viruses.join(', ')}` });
+                }
+            } catch (scanError) {
+                console.error("ClamAV Scan Error:", scanError);
+                // Fail-Safe: If the scanner crashes, block the upload to be safe!
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                return res.status(500).json({ error: "Anti-Virus engine unavailable. Upload aborted for security." });
+            }
+        } else {
+            console.warn("ClamAV is not loaded. Skipping deep scan.");
+        }
+
+        // 1. Check user's current storage and THEIR SPECIFIC max_storage
         const { data: profile } = await supabase
             .from('profiles')
-            .select('storage_used')
+            .select('storage_used, max_storage, role')
             .eq('id', userId)
             .single();
 
         const currentStorage = profile?.storage_used || 0;
-        const ONE_GB_IN_BYTES = 1073741824;
+        // Use their DB limit, or fallback to 1GB
+        const MAX_STORAGE_LIMIT = profile?.max_storage || 1073741824; 
 
-        // 2. Enforce 1GB Quota limit
-        if (currentStorage + file.size > ONE_GB_IN_BYTES) {
+        // 2. Enforce Custom Quota limit (Unless they are an Admin!)
+        if (profile?.role !== 'admin' && currentStorage + file.size > MAX_STORAGE_LIMIT) {
             // Delete the file we just downloaded because it exceeds the quota
             fs.unlinkSync(file.path); 
-            return res.status(403).json({ error: "Storage limit exceeded! (1GB Max)" });
+            return res.status(403).json({ error: `Storage limit exceeded! Max allowed: ${(MAX_STORAGE_LIMIT / (1024*1024*1024)).toFixed(1)}GB` });
         }
 
         // 3. Update Supabase Database
+        const folderId = req.body.folderId === 'null' ? null : req.body.folderId; // Allow null for root
+
         // Add file record
         await supabase.from('files').insert([{
             user_id: userId,
             file_name: file.originalname,
             file_size: file.size,
             file_type: file.mimetype,
-            file_path: file.path
+            file_path: file.path,
+            folder_id: folderId // <-- ADD THIS
         }]);
 
         // Update user's total storage used
@@ -185,6 +243,85 @@ app.post('/api/upload', (req, res) => {
             res.status(500).json({ error: "Server error during upload." });
         }
     });
+});
+
+// Route: Create a New Folder
+app.post('/api/folders', async (req, res) => {
+    try {
+        const { userId, name, parentId } = req.body;
+        if (!userId || !name) return res.status(400).json({ error: "Missing data" });
+
+        const { data, error } = await supabase.from('folders').insert([{
+            user_id: userId,
+            name: name,
+            parent_id: parentId || null
+        }]).select().single();
+
+        if (error) throw error;
+        res.json({ message: "Folder created!", folder: data });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to create folder." });
+    }
+});
+
+// Route: Get Folders for a User (filtered by Parent ID)
+app.get('/api/folders/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const parentId = req.query.parentId; // Optional query param
+
+        let query = supabase.from('folders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        
+        // If parentId is 'null', fetch root folders. Otherwise, fetch inside the specific folder.
+        if (parentId === 'null' || !parentId) {
+            query = query.is('parent_id', null);
+        } else {
+            query = query.eq('parent_id', parentId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch folders" });
+    }
+});
+
+        // Route: Admin Change User Storage Limit
+app.post('/api/admin/set-limit', async (req, res) => {
+    try {
+        const { adminId, targetUserId, newLimitGB } = req.body;
+        
+        if (!adminId || !targetUserId || !newLimitGB) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        // 1. Verify caller is an Admin
+        const { data: adminUser } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', adminId)
+            .single();
+
+        if (adminUser?.role !== 'admin') {
+            return res.status(403).json({ error: "Unauthorized. Admins only." });
+        }
+
+        // 2. Update target user's max_storage
+        const limitInBytes = newLimitGB * 1024 * 1024 * 1024;
+        
+        const { error } = await supabase
+            .from('profiles')
+            .update({ max_storage: limitInBytes })
+            .eq('id', targetUserId);
+
+        if (error) throw error;
+        
+        res.json({ message: `Successfully updated storage limit to ${newLimitGB}GB` });
+    } catch (error) {
+        console.error("Admin set limit error:", error);
+        res.status(500).json({ error: "Server error while updating limit" });
+    }
 });
 
 // Route: Upload a Profile Picture (Avatar)
@@ -225,6 +362,50 @@ app.get('/api/view/avatars/:filename', (req, res) => {
     res.status(404).send("Avatar not found");
 });
 
+// Route: Upload a GCash Receipt
+app.post('/api/receipt', (req, res) => {
+    upload.single('receipt')(req, res, async (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        try {
+            const { userId, requestedTier } = req.body;
+            if (!req.file || !userId) return res.status(400).json({ error: "Missing file or data" });
+
+            // Ensure it's an image
+            if (!req.file.mimetype.includes('image')) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ error: "Receipt must be an image." });
+            }
+
+            const receiptUrl = `/api/view/receipts/${req.file.filename}`;
+
+            // Save request to Supabase
+            const { error } = await supabase.from('upgrade_requests').insert([{
+                user_id: userId,
+                requested_tier: parseInt(requestedTier),
+                receipt_url: receiptUrl
+            }]);
+
+            if (error) throw error;
+            res.json({ message: "Receipt submitted for Admin review!" });
+        } catch (error) {
+            res.status(500).json({ error: "Server error" });
+        }
+    });
+});
+
+// Route: View a Receipt (Bypasses RLS so Admins can see it)
+app.get('/api/view/receipts/:filename', (req, res) => {
+    const uploadsPath = path.join(__dirname, 'uploads');
+    const files = fs.readdirSync(uploadsPath, { withFileTypes: true });
+    for (const dir of files) {
+        if (dir.isDirectory()) {
+            const possiblePath = path.join(uploadsPath, dir.name, req.params.filename);
+            if (fs.existsSync(possiblePath)) return res.sendFile(possiblePath);
+        }
+    }
+    res.status(404).send("Receipt not found");
+});
+
 // Route: Rename a File
 app.put('/api/rename/:fileId', async (req, res) => {
     try {
@@ -248,16 +429,21 @@ app.put('/api/rename/:fileId', async (req, res) => {
     }
 });
 
-// Route: Get All Files for a User
+// Route: Get Files (filtered by Folder ID)
 app.get('/api/files/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const { data, error } = await supabase
-            .from('files')
-            .select('*')
-            .eq('user_id', userId)
-            .order('upload_date', { ascending: false });
+        const folderId = req.query.folderId;
 
+        let query = supabase.from('files').select('*').eq('user_id', userId).order('upload_date', { ascending: false });
+        
+        if (folderId === 'null' || !folderId) {
+            query = query.is('folder_id', null);
+        } else {
+            query = query.eq('folder_id', folderId);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         res.json(data);
     } catch (error) {
@@ -387,6 +573,20 @@ app.put('/api/admin/users/role', async (req, res) => {
     res.json({ message: `User is now an ${newRole}!` });
 });
 
+// Route: Upgrade/Downgrade User Storage Tier
+app.put('/api/admin/users/storage', async (req, res) => {
+    const { adminId, targetUserId, newStorageLimit } = req.body;
+    if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
+
+    const { error } = await supabase.from('profiles').update({ max_storage: newStorageLimit }).eq('id', targetUserId);
+    if (error) return res.status(500).json({ error: "Failed to update storage tier" });
+    
+    // Log the upgrade!
+    logAudit(adminId, 'ACCOUNT_UPGRADED', `Admin changed user storage tier to ${(newStorageLimit / (1024*1024*1024)).toFixed(1)} GB`, req);
+    
+    res.json({ message: `User storage tier upgraded!` });
+});
+
 // Route: Delete ANY file from the server
 app.delete('/api/admin/files/:fileId', async (req, res) => {
     const { adminId } = req.body;
@@ -457,5 +657,45 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to ban user." });
+    }
+});
+
+// Route: Approve or Reject Upgrade Request (With 30-Day Expiry)
+app.put('/api/admin/requests/:requestId', async (req, res) => {
+    const { adminId, status, userId, requestedTier } = req.body;
+    const { requestId } = req.params;
+    
+    if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
+
+    try {
+        await supabase.from('upgrade_requests').update({ status }).eq('id', requestId);
+
+        if (status === 'approved') {
+            // 1. Calculate exactly 30 days from right now
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 30);
+
+            // 2. Grant them the storage AND the expiry date
+            await supabase.from('profiles').update({ 
+                max_storage: requestedTier,
+                plan_expires_at: expiryDate.toISOString() 
+            }).eq('id', userId);
+
+            await supabase.from('notifications').insert([{
+                user_id: userId,
+                title: '🎉 Upgrade Approved!',
+                message: `Your account has been upgraded! Your subscription is active for 30 days.`
+            }]);
+        } else {
+            await supabase.from('notifications').insert([{
+                user_id: userId,
+                title: '❌ Upgrade Rejected',
+                message: `Your GCash receipt was invalid. Please try again.`
+            }]);
+        }
+
+        res.json({ message: `Request ${status} successfully!` });
+    } catch (error) {
+        res.status(500).json({ error: "Failed to process request." });
     }
 });

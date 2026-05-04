@@ -3,12 +3,24 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, UploadCloud, HardDrive, File, Loader2, Download, Trash2, Image as ImageIcon, FileText, Grid, List, X, Settings, User, Mail, Calendar, Shield, Phone, AlignLeft, Sun, Moon, Clock, PlayCircle, LayoutGrid, FolderSearch, Edit2, Camera, Bell, AlertTriangle, AlertOctagon, CheckCircle2 } from 'lucide-react';
+import { 
+  LogOut, UploadCloud, HardDrive, File, Loader2, Download, Trash2, 
+  Image as ImageIcon, FileText, Grid, List, X, Settings, User, Mail, 
+  Calendar, Shield, Phone, AlignLeft, Sun, Moon, Clock, PlayCircle, 
+  LayoutGrid, AlertOctagon, Edit2, Camera, Infinity, CreditCard, 
+  CheckCircle2, ArrowLeft, Upload, Bell, AlertTriangle, FolderSearch,
+  FolderPlus, Folder, ChevronRight, CornerUpLeft
+} from 'lucide-react';
 
 export default function Dashboard() {
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedTier, setSelectedTier] = useState(null); // Will hold bytes: 5368709120 or 16106127360
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [files, setFiles] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [currentFolder, setCurrentFolder] = useState(null); // null means "Root" directory
+  const [breadcrumbs, setBreadcrumbs] = useState([{ id: null, name: 'Home' }]);
   const [notifications, setNotifications] = useState([]);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,7 +45,6 @@ export default function Dashboard() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   const navigate = useNavigate();
-  const MAX_STORAGE = 1073741824; 
 
   // Automatically use localhost:5000 for testing, but use relative paths for production!
   const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
@@ -52,12 +63,29 @@ export default function Dashboard() {
 
   useEffect(() => { checkUser(); }, []);
 
+  const fetchContent = async (userId, folderId = null) => {
+    try {
+      const folderQuery = folderId ? `?parentId=${folderId}` : '?parentId=null';
+      const fileQuery = folderId ? `?folderId=${folderId}` : '?folderId=null';
+
+      const [folderRes, fileRes] = await Promise.all([
+        fetch(`${API_URL}/api/folders/${userId}${folderQuery}`),
+        fetch(`${API_URL}/api/files/${userId}${fileQuery}`)
+      ]);
+      
+      setFolders(await folderRes.json());
+      setFiles(await fileRes.json());
+    } catch (error) {
+      console.error("Fetch failed");
+    }
+  };
+
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return navigate('/');
     setUser(session.user);
     fetchProfile(session.user.id);
-    fetchFiles(session.user.id);
+    fetchContent(session.user.id, null); // Start at root
     fetchNotifications(session.user.id); // <-- ADD THIS
   };
 
@@ -77,10 +105,38 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  const fetchFiles = async (userId) => {
-    const response = await fetch(`${API_URL}/api/files/${userId}`);
-    const data = await response.json();
-    setFiles(data);
+  const navigateBreadcrumb = (index) => {
+    const target = breadcrumbs[index];
+    const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
+    setBreadcrumbs(newBreadcrumbs);
+    setCurrentFolder(target.id);
+    fetchContent(user.id, target.id);
+  };
+
+  const openFolder = (folder) => {
+    setBreadcrumbs([...breadcrumbs, { id: folder.id, name: folder.name }]);
+    setCurrentFolder(folder.id);
+    fetchContent(user.id, folder.id);
+  };
+
+  const handleCreateFolder = async () => {
+    const folderName = prompt('Enter folder name:');
+    if (!folderName) return;
+
+    try {
+      await fetch(`${API_URL}/api/folders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          userId: user.id, 
+          name: folderName, 
+          parentId: currentFolder 
+        })
+      });
+      fetchContent(user.id, currentFolder); // Refresh view
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleLogout = async () => {
@@ -125,6 +181,9 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('userId', user.id);
+    
+    // Pass the folderId! If we're at home, pass 'null'
+    formData.append('folderId', currentFolder || 'null');
 
     try {
       const response = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
@@ -133,7 +192,7 @@ export default function Dashboard() {
       if (!response.ok) throw new Error(result.error || "Upload failed");
       
       fetchProfile(user.id); 
-      fetchFiles(user.id);
+      fetchContent(user.id, currentFolder); // Refresh files in THIS folder
       toast.success("File uploaded securely!");
     } catch (error) {
       toast.error(error.message);
@@ -150,7 +209,7 @@ export default function Dashboard() {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id })
     });
     fetchProfile(user.id);
-    fetchFiles(user.id);
+    fetchContent(user.id, currentFolder); // Refresh files in THIS folder
     setPreviewFile(null);
     toast.success("File permanently deleted.");
   };
@@ -177,6 +236,30 @@ export default function Dashboard() {
     }
   };
 
+  // 💳 SUBMIT GCASH RECEIPT
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedTier) return;
+    
+    const toastId = toast.loading("Submitting receipt for review...");
+    const formData = new FormData();
+    formData.append('receipt', file);
+    formData.append('userId', user.id);
+    formData.append('requestedTier', selectedTier);
+
+    try {
+      const response = await fetch(`${API_URL}/api/receipt`, { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      
+      toast.success("Receipt submitted! Admins will review it shortly.", { id: toastId });
+      setShowUpgradeModal(false);
+      setSelectedTier(null);
+    } catch (error) {
+      toast.error(error.message, { id: toastId });
+    }
+  };
+
   // ✏️ RENAME FILE
   const handleRename = async (fileId, currentName) => {
     const newName = window.prompt("Enter new file name:", currentName);
@@ -190,7 +273,7 @@ export default function Dashboard() {
       if (!response.ok) throw new Error("Rename failed");
       
       toast.success("File renamed!");
-      fetchFiles(user.id);
+      fetchContent(user.id, currentFolder);
       setPreviewFile(null); // Close preview if open
     } catch (error) {
       toast.error(error.message);
@@ -245,7 +328,6 @@ export default function Dashboard() {
   const totalFiles = files.length;
   const lastUpload = files.length > 0 ? new Date(files[0].upload_date) : null;
   
-  // Format the "Time Ago" for the last upload
   const timeAgo = (date) => {
     if (!date) return 'Never';
     const seconds = Math.floor((new Date() - date) / 1000);
@@ -255,11 +337,38 @@ export default function Dashboard() {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-victus-dark"><Loader2 className="animate-spin h-10 w-10 text-victus-accent" /></div>;
-
+  // 🧮 CALCULATE STORAGE (Dynamic for Admins and Upgraded Users)
   const storageUsed = profile?.storage_used || 0;
-  const storagePercent = Math.min((storageUsed / MAX_STORAGE) * 100, 100);
+  const maxStorage = profile?.max_storage || 1073741824; // DB limit or 1GB fallback
+  
+  // 🧮 CALCULATE SUBSCRIPTION EXPIRY
+  let daysRemaining = null;
+  let isExpired = false;
+
+  if (profile?.plan_expires_at && profile?.role !== 'admin') {
+    const expiryDate = new Date(profile.plan_expires_at);
+    const now = new Date();
+    const timeDiff = expiryDate - now;
+    
+    if (timeDiff <= 0) {
+      isExpired = true; // The 30 days are up!
+    } else {
+      daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)); // Convert milliseconds to Days
+    }
+  }
+
+  // If they are expired, force their UI to act like they are on 1GB
+  const effectiveMaxStorage = isExpired ? 1073741824 : (profile?.max_storage || 1073741824);
+  const storagePercent = Math.min((storageUsed / effectiveMaxStorage) * 100, 100);
   const usedMB = (storageUsed / (1024 * 1024)).toFixed(2);
+  const maxMB = (effectiveMaxStorage / (1024 * 1024)).toFixed(0);
+  
+  // Calculate Available Storage (MB) for the top banner
+  const availableMB = profile?.role === 'admin' 
+    ? 'Unlimited' 
+    : ((effectiveMaxStorage - storageUsed) / (1024 * 1024)).toFixed(2) + ' MB';
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-victus-dark"><Loader2 className="animate-spin h-10 w-10 text-victus-accent" /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-victus-dark text-gray-900 dark:text-white p-6 relative transition-colors duration-300">
@@ -363,7 +472,7 @@ export default function Dashboard() {
         </div>
         <div className="bg-white dark:bg-victus-card p-5 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4 transition-colors duration-300">
           <div className="bg-green-100 dark:bg-green-500/10 p-3 rounded-lg"><HardDrive className="h-6 w-6 text-green-500" /></div>
-          <div><p className="text-sm font-medium text-gray-500 dark:text-gray-400">Available Storage</p><p className="text-2xl font-bold text-gray-900 dark:text-white">{(1024 - parseFloat(usedMB)).toFixed(2)} MB</p></div>
+          <div><p className="text-sm font-medium text-gray-500 dark:text-gray-400">Available Storage</p><p className="text-2xl font-bold text-gray-900 dark:text-white">{availableMB}</p></div>
         </div>
         <div className="bg-white dark:bg-victus-card p-5 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center gap-4 transition-colors duration-300">
           <div className="bg-purple-100 dark:bg-purple-500/10 p-3 rounded-lg"><Clock className="h-6 w-6 text-purple-500" /></div>
@@ -394,13 +503,55 @@ export default function Dashboard() {
           {/* STORAGE QUOTA */}
           <div className="bg-white dark:bg-victus-card p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-300">
             <h2 className="text-sm font-semibold mb-3 text-gray-600 dark:text-gray-400 flex items-center gap-2"><HardDrive className="h-4 w-4"/> Storage Quota</h2>
-            <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${storagePercent}%` }} className={`h-full rounded-full ${storagePercent > 90 ? 'bg-red-500' : 'bg-victus-accent'}`} />
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-gray-500 dark:text-gray-400 font-medium">{usedMB} MB used</span>
-              <span className="text-gray-400 dark:text-gray-500">1024 MB total</span>
-            </div>
+            
+            {profile?.role === 'admin' ? (
+              // 👑 ADMIN STORAGE VIEW
+              <div className="text-center py-2">
+                <div className="flex justify-center mb-1"><Infinity className="h-8 w-8 text-victus-accent" /></div>
+                <p className="text-sm font-bold text-gray-900 dark:text-white">Unlimited Storage</p>
+                <p className="text-xs text-gray-500 mt-1">{usedMB} MB used</p>
+              </div>
+            ) : (
+              // 👤 USER STORAGE VIEW
+              <>
+                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2.5 mb-2 overflow-hidden">
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${storagePercent}%` }} className={`h-full rounded-full ${storagePercent > 90 ? 'bg-red-500' : 'bg-victus-accent'}`} />
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500 dark:text-gray-400 font-medium">{usedMB} MB used</span>
+                  <span className="text-gray-400 dark:text-gray-500">{maxMB} MB total</span>
+                </div>
+
+                {/* 💳 UPSELL / SUBSCRIPTION DAYS */}
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 text-center">
+                  
+                  {isExpired ? (
+                    // EXPIRED STATE
+                    <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3 mb-3">
+                      <p className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center justify-center gap-1"><AlertTriangle className="h-3 w-3"/> SUBSCRIPTION EXPIRED</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Storage reduced to 1GB.</p>
+                    </div>
+                  ) : daysRemaining !== null ? (
+                    // ACTIVE PRO STATE
+                    <div className="bg-sky-50 dark:bg-sky-500/10 border border-sky-100 dark:border-sky-500/20 rounded-lg p-3">
+                      <p className="text-xs font-bold text-sky-600 dark:text-sky-400 mb-1">PRO PLAN ACTIVE</p>
+                      <p className="text-xs font-bold text-gray-900 dark:text-white">{daysRemaining} Days Remaining</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">Renews manually via GCash</p>
+                    </div>
+                  ) : null}
+
+                  {/* Show Upgrade Button if Free or Expired */}
+                  {effectiveMaxStorage <= 1073741824 && (
+                    <>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 mt-3">Running out of space?</p>
+                      <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-gradient-to-r from-sky-400 to-blue-600 hover:from-sky-500 hover:to-blue-700 text-white text-xs font-bold py-2 rounded-lg transition-all shadow-md shadow-blue-500/20">
+                        {isExpired ? "Renew Pro Plan" : "Upgrade to Pro"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* ⏳ RECENT ACTIVITY FEED */}
@@ -428,14 +579,34 @@ export default function Dashboard() {
         <div className="lg:col-span-3 bg-white dark:bg-victus-card p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm min-h-[600px] flex flex-col transition-colors duration-300">
           
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white shrink-0">
-              <FolderSearch className="h-6 w-6 text-victus-accent" /> Workspace
+            <h2 className="text-sm font-bold flex items-center flex-wrap gap-2 text-gray-900 dark:text-white shrink-0">
+              {breadcrumbs.map((crumb, index) => (
+                <div key={crumb.id || 'root'} className="flex items-center gap-2">
+                  <span 
+                    onClick={() => navigateBreadcrumb(index)}
+                    className="cursor-pointer hover:text-sky-500 transition-colors flex items-center gap-1"
+                  >
+                    {index === 0 ? <HardDrive className="h-5 w-5 text-victus-accent" /> : <Folder className="h-4 w-4" />}
+                    {crumb.name}
+                  </span>
+                  {index < breadcrumbs.length - 1 && <ChevronRight className="h-4 w-4 text-gray-400" />}
+                </div>
+              ))}
             </h2>
             
-            <div className="relative w-full max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FolderSearch className="h-4 w-4 text-gray-400" /></div>
-              <input type="text" placeholder="Search files..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-xl py-2 pl-10 pr-10 focus:outline-none focus:border-victus-accent focus:ring-1 focus:ring-victus-accent transition-colors shadow-inner" />
-              {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X className="h-4 w-4" /></button>}
+            <div className="flex gap-2 w-full max-w-md">
+              <button 
+                onClick={handleCreateFolder}
+                className="flex items-center justify-center gap-2 bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 px-3 border border-sky-200 dark:border-sky-500/20 rounded-xl hover:bg-sky-100 hover:dark:bg-sky-500/20 transition-all font-medium text-sm flex-shrink-0"
+              >
+                <FolderPlus className="h-4 w-4" /> <span className="hidden sm:inline">New Folder</span>
+              </button>
+
+              <div className="relative w-full">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FolderSearch className="h-4 w-4 text-gray-400" /></div>
+                <input type="text" placeholder="Search files..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-xl py-2 pl-10 pr-10 focus:outline-none focus:border-victus-accent focus:ring-1 focus:ring-victus-accent transition-colors shadow-inner" />
+                {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><X className="h-4 w-4" /></button>}
+              </div>
             </div>
           </div>
           
@@ -454,10 +625,37 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* 📂 FOLDER GRID */}
+          {folders.length > 0 && (
+            <div className="mb-6 px-1">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Folders</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {folders.map(folder => (
+                  <motion.div
+                    key={folder.id}
+                    whileHover={{ y: -2, scale: 1.02 }}
+                    onClick={() => openFolder(folder)}
+                    className="bg-white dark:bg-victus-card border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center gap-3 cursor-pointer shadow-sm hover:shadow-md hover:border-sky-500/50 transition-all group"
+                  >
+                    <div className="bg-sky-100 dark:bg-sky-500/20 p-2 rounded-lg group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                      <Folder className="h-5 w-5 text-sky-500 group-hover:text-white" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{folder.name}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* THE FILES */}
           <div className="flex-1">
-            {files.length === 0 ? (
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              {currentFolder ? 'Files' : 'Files'}
+            </h3>
+            {files.length === 0 && folders.length === 0 ? (
                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400 dark:text-gray-500"><UploadCloud className="h-16 w-16 mb-4 opacity-20" /><p className="text-lg font-medium text-gray-900 dark:text-white mb-1">Your drive is empty</p><p className="text-sm">Upload a file to get started.</p></div>
+            ) : filteredFiles.length === 0 && folders.length > 0 ? (
+               <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400 dark:text-gray-500"><FolderSearch className="h-16 w-16 mb-4 opacity-20 text-sky-500" /><p className="text-lg font-medium text-gray-900 dark:text-white mb-1">No files in this folder</p></div>
             ) : filteredFiles.length === 0 ? (
                <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-gray-400 dark:text-gray-500"><FolderSearch className="h-16 w-16 mb-4 opacity-20 text-sky-500" /><p className="text-lg font-medium text-gray-900 dark:text-white mb-1">No files found</p><p className="text-sm">Try adjusting your filters or search query.</p></div>
             ) : (
@@ -711,6 +909,72 @@ export default function Dashboard() {
         ))}
       </AnimatePresence>
 
+      {/* 💳 UPGRADE / GCASH MODAL */}
+      <AnimatePresence>
+        {showUpgradeModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white dark:bg-victus-card border border-gray-200 dark:border-gray-700 rounded-2xl p-6 w-full max-w-3xl shadow-2xl relative my-8">
+              <button onClick={() => { setShowUpgradeModal(false); setSelectedTier(null); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white"><X className="h-6 w-6" /></button>
+
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Upgrade Your Storage</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto">Automated checkout is currently in development. For now, please select a plan and upload a screenshot of your GCash payment. Admin approval takes less than 24 hours.</p>
+              </div>
+
+              {!selectedTier ? (
+                // VIEW 1: SELECT A TIER
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  {/* Pro Plan */}
+                  <div onClick={() => setSelectedTier(5368709120)} className="border-2 border-gray-200 dark:border-gray-800 hover:border-sky-500 dark:hover:border-sky-500 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg group">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Pro Plan (5GB)</h3>
+                    <div className="text-3xl font-extrabold text-sky-500 mb-4">₱50 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">/ month</span></div>
+                    <ul className="space-y-3 mb-6 text-sm text-gray-600 dark:text-gray-300">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-sky-500" /> 5GB Persistent Storage</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-sky-500" /> Up to 50MB per file</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-sky-500" /> Priority Support</li>
+                    </ul>
+                    <div className="w-full text-center py-2 rounded-lg bg-gray-100 dark:bg-gray-800 group-hover:bg-sky-500 group-hover:text-white font-bold transition-colors">Select Plan</div>
+                  </div>
+
+                  {/* Max Plan */}
+                  <div onClick={() => setSelectedTier(16106127360)} className="border-2 border-blue-500 relative rounded-xl p-6 cursor-pointer transition-all hover:shadow-xl shadow-blue-500/20 group">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Best Value</div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Max Plan (15GB)</h3>
+                    <div className="text-3xl font-extrabold text-blue-500 mb-4">₱120 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">/ month</span></div>
+                    <ul className="space-y-3 mb-6 text-sm text-gray-600 dark:text-gray-300">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> 15GB Persistent Storage</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> Up to 50MB per file</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500" /> Early Access to V2 Features</li>
+                    </ul>
+                    <div className="w-full text-center py-2 rounded-lg bg-blue-500 text-white font-bold transition-colors shadow-md shadow-blue-500/30">Select Plan</div>
+                  </div>
+                </div>
+              ) : (
+                // VIEW 2: GCASH PAYMENT & UPLOAD
+                <div className="max-w-md mx-auto">
+                  <button onClick={() => setSelectedTier(null)} className="text-sm text-sky-500 hover:underline mb-6 flex items-center gap-1"><ArrowLeft className="h-4 w-4" /> Back to Plans</button>
+                  
+                  <div className="bg-blue-50 dark:bg-[#005CE6]/10 border border-blue-200 dark:border-[#005CE6]/30 p-6 rounded-xl text-center mb-6">
+                    <img src="https://upload.wikimedia.org/wikipedia/en/thumb/0/07/GCash_logo.svg/1200px-GCash_logo.svg.png" alt="GCash" className="h-8 mx-auto mb-4 object-contain" />
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Please send exactly <span className="font-bold text-gray-900 dark:text-white">₱{selectedTier === 5368709120 ? '50' : '120'}</span> to:</p>
+                    <p className="text-2xl font-extrabold text-[#005CE6] tracking-wider mb-1">0927 178 9072</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white uppercase">MARK JAMES L. ALCANTARA</p>
+                  </div>
+
+                  <label className="border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-sky-500 dark:hover:border-sky-500 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors group bg-gray-50 dark:bg-gray-900/50">
+                    <input type="file" accept="image/*" onChange={handleReceiptUpload} className="hidden" />
+                    <div className="bg-white dark:bg-gray-800 p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                      <Upload className="h-6 w-6 text-sky-500" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 dark:text-white mb-1">Upload GCash Screenshot</h3>
+                    <p className="text-xs text-gray-500 text-center">JPG, PNG. Max 5MB.<br/>Ensure the reference number is clearly visible.</p>
+                  </label>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

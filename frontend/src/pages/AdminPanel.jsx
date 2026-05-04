@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, Activity, Cpu, HardDrive, Users, ArrowLeft, Trash2, ShieldCheck, Shield, FileText, Download, FolderSearch, Sun, Moon, FileWarning, Image as ImageIcon, PlayCircle, File as FileIcon } from 'lucide-react';
+import { ShieldAlert, Activity, Cpu, HardDrive, Users, ArrowLeft, Trash2, ShieldCheck, Shield, FileText, Download, FolderSearch, Sun, Moon, FileWarning, Image as ImageIcon, PlayCircle, File as FileIcon, CreditCard, CheckCircle2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [globalFiles, setGlobalFiles] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [upgradeRequests, setUpgradeRequests] = useState([]); // <-- NEW STATE
   const [fileFilterUser, setFileFilterUser] = useState('ALL');
   const [loading, setLoading] = useState(true);
   
@@ -37,6 +38,7 @@ export default function AdminPanel() {
     const interval = setInterval(() => { 
       if (activeTab === 'overview') fetchServerStats(); 
       if (activeTab === 'logs') fetchAuditLogs();
+      if (activeTab === 'upgrades') fetchUpgradeRequests(); // <-- ADD THIS
     }, 2000); 
     return () => clearInterval(interval);
   }, [activeTab]);
@@ -55,6 +57,7 @@ export default function AdminPanel() {
     fetchAllUsers();
     fetchAllFiles(session.user.id);
     fetchAuditLogs();
+    fetchUpgradeRequests();
     setLoading(false);
   };
 
@@ -92,6 +95,16 @@ export default function AdminPanel() {
     if (data) setAuditLogs(data);
   };
 
+  const fetchUpgradeRequests = async () => {
+    // Fetch all pending requests and join the user's name
+    const { data } = await supabase
+      .from('upgrade_requests')
+      .select('*, profiles(full_name)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (data) setUpgradeRequests(data);
+  };
+
   const handleChangeRole = async (targetId, newRole) => {
     if (!window.confirm(`Are you sure you want to change this user's role to ${newRole.toUpperCase()}?`)) return;
     const response = await fetch(`${API_URL}/api/admin/users/role`, {
@@ -102,6 +115,24 @@ export default function AdminPanel() {
       toast.success(`User is now an ${newRole}!`);
       fetchAllUsers();
     } else toast.error("Failed to change role.");
+  };
+
+  // 💾 MODERATION: Change Storage Tier
+  const handleUpgradeStorage = async (targetId, newStorageBytes) => {
+    const gbAmount = newStorageBytes / (1024*1024*1024);
+    if (!window.confirm(`Upgrade this user to the ${gbAmount}GB Tier?`)) return;
+
+    const response = await fetch(`${API_URL}/api/admin/users/storage`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId: adminUser.id, targetUserId: targetId, newStorageLimit: newStorageBytes })
+    });
+    
+    if (response.ok) {
+      toast.success(`User upgraded to ${gbAmount}GB Tier!`);
+      fetchAllUsers();
+    } else {
+      toast.error("Failed to upgrade storage.");
+    }
   };
 
   const handleBanUser = async (targetId, targetName) => {
@@ -124,6 +155,26 @@ export default function AdminPanel() {
     if (response.ok) {
       toast.success("File forcefully deleted.");
       fetchAllFiles(adminUser.id);
+    }
+  };
+
+  // 💳 MODERATION: Process GCash Upgrade Requests
+  const handleProcessRequest = async (requestId, userId, requestedTier, status) => {
+    const actionStr = status === 'approved' ? 'APPROVE' : 'REJECT';
+    if (!window.confirm(`Are you sure you want to ${actionStr} this payment?`)) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/requests/${requestId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: adminUser.id, status, userId, requestedTier })
+      });
+      if (!response.ok) throw new Error("Failed to process request");
+      
+      toast.success(`Request ${status} successfully!`);
+      fetchUpgradeRequests(); // Refresh the list
+      fetchAllUsers(); // Refresh the user list so their storage updates!
+    } catch (error) {
+      toast.error(error.message);
     }
   };
 
@@ -201,6 +252,12 @@ export default function AdminPanel() {
         </button>
         <button onClick={() => setActiveTab('logs')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'logs' ? 'bg-orange-50 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
           <FileWarning className="h-4 w-4" /> Security Logs
+        </button>
+        {/* NEW UPGRADES TAB */}
+        <button onClick={() => setActiveTab('upgrades')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors relative ${activeTab === 'upgrades' ? 'bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+          <CreditCard className="h-4 w-4" /> Pending Upgrades
+          {/* Notification Dot if there are pending requests! */}
+          {upgradeRequests.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
         </button>
       </div>
 
@@ -313,13 +370,23 @@ export default function AdminPanel() {
                             {u.role === 'admin' ? <ShieldCheck className="h-4 w-4 text-red-500" title="Admin" /> : <Shield className="h-4 w-4 text-gray-400 dark:text-gray-600" title="User" />}
                           </div>
                         </td>
-                        <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{(u.storage_used / (1024 * 1024)).toFixed(2)} MB</td>
+                        <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{(u.storage_used / (1024 * 1024)).toFixed(2)} MB / {((u.max_storage || 1073741824) / (1024 * 1024 * 1024)).toFixed(0)} GB</td>
                         <td className="p-4 text-sm text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
                         <td className="p-4 flex justify-end items-center gap-3">
                           {u.id !== adminUser.id && (
                             <>
                               <select value={u.role} onChange={(e) => handleChangeRole(u.id, e.target.value)} className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer">
                                 <option value="user">User</option><option value="admin">Admin</option>
+                              </select>
+                              {/* 💾 STORAGE TIER DROPDOWN */}
+                              <select 
+                                value={u.max_storage || 1073741824} 
+                                onChange={(e) => handleUpgradeStorage(u.id, Number(e.target.value))} 
+                                className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer"
+                              >
+                                <option value={1073741824}>1 GB (Free)</option>
+                                <option value={5368709120}>5 GB (Pro)</option>
+                                <option value={16106127360}>15 GB (Max)</option>
                               </select>
                               <button onClick={() => handleWarnUser(u.id, u.full_name)} className="bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 hover:bg-yellow-500 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1">
                                 <ShieldAlert className="h-3 w-3" /> Warn
@@ -433,6 +500,61 @@ export default function AdminPanel() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 5: UPGRADE REQUESTS */}
+          {activeTab === 'upgrades' && (
+            <motion.div key="upgrades" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="bg-white dark:bg-victus-card rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                  <CreditCard className="h-5 w-5 text-blue-500 dark:text-blue-400" /> Pending GCash Payments
+                </h2>
+                <span className="text-sm bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full font-bold">{upgradeRequests.length} Pending</span>
+              </div>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto p-6">
+                
+                {upgradeRequests.length === 0 ? (
+                  <div className="text-center p-12 text-gray-500 dark:text-gray-400">No pending upgrade requests.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {upgradeRequests.map((req) => (
+                      <div key={req.id} className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm flex flex-col">
+                        
+                        {/* Header: User & Tier */}
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start bg-white dark:bg-[#0d1117]">
+                          <div>
+                            <p className="font-bold text-gray-900 dark:text-white truncate w-40">{req.profiles?.full_name}</p>
+                            <p className="text-xs text-gray-500">{new Date(req.created_at).toLocaleString()}</p>
+                          </div>
+                          <span className="bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
+                            {(req.requested_tier / (1024*1024*1024)).toFixed(0)} GB Plan
+                          </span>
+                        </div>
+
+                        {/* Middle: The GCash Screenshot */}
+                        <div className="h-48 bg-gray-200 dark:bg-black p-2 flex items-center justify-center relative group cursor-pointer" onClick={() => window.open(`${API_URL}${req.receipt_url}`, '_blank')}>
+                          <img src={`${API_URL}${req.receipt_url}`} alt="Receipt" className="max-w-full max-h-full object-contain" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="text-white font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5"/> View Full Image</span>
+                          </div>
+                        </div>
+
+                        {/* Bottom: Approve / Reject Buttons */}
+                        <div className="p-4 flex gap-3 mt-auto bg-white dark:bg-[#0d1117]">
+                          <button onClick={() => handleProcessRequest(req.id, req.user_id, req.requested_tier, 'rejected')} className="flex-1 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-600 hover:text-white py-2 rounded-lg font-bold text-sm transition-colors">
+                            Reject
+                          </button>
+                          <button onClick={() => handleProcessRequest(req.id, req.user_id, req.requested_tier, 'approved')} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-1">
+                            <CheckCircle2 className="h-4 w-4"/> Approve
+                          </button>
+                        </div>
+
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
