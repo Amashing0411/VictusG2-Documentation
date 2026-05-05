@@ -35,7 +35,7 @@
 6. [API Reference](#-api-reference)
 7. [Production Deployment (VPS/Ubuntu)](#-production-deployment-vpsubuntu)
 8. [Team & Contributions](#-team--contributions)
-9. [Roadmap (v2.0)](#️-roadmap-v20)
+9. [Roadmap (v3.0)](#️-roadmap-v20)
 10. [License](#-license)
 
 ---
