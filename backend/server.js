@@ -539,11 +539,13 @@ app.put('/api/admin/users/role', async (req, res) => {
     const { adminId, targetUserId, newRole } = req.body;
     if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
 
-    // 🛡️ SUPER ADMIN PROTECTION: Prevent demoting other Admins!
+    // 🛡️ SUPER ADMIN PROTECTION
     const { data: targetUser } = await supabase.from('profiles').select('role').eq('id', targetUserId).single();
-    if (targetUser?.role === 'admin' && newRole === 'user') {
+    
+    // Block the action IF the target is an Admin AND the person clicking the button is NOT the Root Owner!
+    if (targetUser?.role === 'admin' && newRole === 'user' && adminId !== process.env.ROOT_ADMIN_ID) {
         logAudit(adminId, 'SECURITY_WARNING', `Attempted to unlawfully demote another Admin (ID: ${targetUserId})`, req);
-        return res.status(403).json({ error: "Permission Denied: You cannot demote another Administrator." });
+        return res.status(403).json({ error: "Permission Denied: Only the Root Owner can demote Administrators." });
     }
 
     const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', targetUserId);
@@ -621,11 +623,13 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
     const targetUserId = req.params.userId;
     if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
 
-    // 🛡️ SUPER ADMIN PROTECTION: Prevent banning other Admins!
+    // 🛡️ SUPER ADMIN PROTECTION
     const { data: targetUser } = await supabase.from('profiles').select('role').eq('id', targetUserId).single();
-    if (targetUser?.role === 'admin') {
+    
+    // Block the ban IF the target is an Admin AND the person clicking the button is NOT the Root Owner!
+    if (targetUser?.role === 'admin' && adminId !== process.env.ROOT_ADMIN_ID) {
         logAudit(adminId, 'SECURITY_WARNING', `Attempted to unlawfully BAN another Admin! (ID: ${targetUserId})`, req);
-        return res.status(403).json({ error: "Permission Denied: You cannot ban another Administrator." });
+        return res.status(403).json({ error: "Permission Denied: Only the Root Owner can ban Administrators." });
     }
 
     try {

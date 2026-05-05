@@ -22,6 +22,7 @@ export default function AdminPanel() {
   const navigate = useNavigate();
 
   const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
+  const ROOT_ADMIN_ID = import.meta.env.VITE_ROOT_ADMIN_ID;
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
@@ -54,6 +55,14 @@ export default function AdminPanel() {
     }
     
     setAdminUser(session.user);
+    
+    // --- DEBUGGING THE ROOT OWNER BUG ---
+    console.log("===============================");
+    console.log("MY CURRENT USER ID:", session.user.id);
+    console.log("THE ROOT ADMIN ID FROM .ENV:", ROOT_ADMIN_ID);
+    console.log("DO THEY MATCH?", session.user.id === ROOT_ADMIN_ID);
+    console.log("===============================");
+
     fetchAllUsers();
     fetchAllFiles(session.user.id);
     fetchAuditLogs();
@@ -373,8 +382,8 @@ export default function AdminPanel() {
                         <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{(u.storage_used / (1024 * 1024)).toFixed(2)} MB / {((u.max_storage || 1073741824) / (1024 * 1024 * 1024)).toFixed(0)} GB</td>
                         <td className="p-4 text-sm text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
                         <td className="p-4 flex justify-end items-center gap-3">
-                          {/* If the target is NOT an admin, show all moderation tools! */}
-                          {u.role !== 'admin' && (
+                          {/* Show moderation tools IF they are a normal user OR if YOU are the Root Owner! */}
+                          {(u.role !== 'admin' || adminUser.id === ROOT_ADMIN_ID) && u.id !== adminUser.id && (
                             <>
                               <select value={u.role} onChange={(e) => handleChangeRole(u.id, e.target.value)} className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer">
                                 <option value="user">User</option>
@@ -397,17 +406,17 @@ export default function AdminPanel() {
                             </>
                           )}
 
-                          {/* If the target IS an admin, protect them! */}
-                          {u.role === 'admin' && u.id !== adminUser.id && (
+                          {/* Hide the buttons and show "Protected" if the target is an Admin and you are NOT the Root Owner */}
+                          {u.role === 'admin' && u.id !== adminUser.id && adminUser.id !== ROOT_ADMIN_ID && (
                             <span className="text-xs font-bold text-red-500 bg-red-100 dark:bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-500/20">
                               Protected Admin
                             </span>
                           )}
 
-                          {/* If it's YOU, show "You" */}
+                          {/* Show the Root Owner badge for yourself! */}
                           {u.id === adminUser.id && (
                             <span className="text-xs font-bold text-sky-500 bg-sky-100 dark:bg-sky-500/10 px-3 py-1.5 rounded-lg border border-sky-200 dark:border-sky-500/20">
-                              You (Super Admin)
+                              You ({adminUser.id === ROOT_ADMIN_ID ? 'Root Owner' : 'Admin'})
                             </span>
                           )}
                         </td>
