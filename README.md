@@ -244,7 +244,7 @@ Developed and maintained by **Group 2**.
 | Team Member | Detailed Contributions |
 | :--- | :--- |
 | **Mark James Alcantara** | Lead System Architect and Full-Stack Developer responsible for designing the overall system architecture, implementing the React frontend, developing the Express.js backend API, configuring Multer-based file validation, integrating Supabase authentication and database logic, and deploying the application using Nginx, SSL (Certbot), and PM2. Also handled CI/CD considerations and infrastructure optimization. |
-| **Alleny P. Hernandez** | Project Manager responsible for coordinating development timelines, managing cloud resource allocation, monitoring operational expenses, and securing GitHub Student Developer Pack benefits for infrastructure support. |
+| **Alleny P. Hernandez** | Quality Assurance and Project Manager responsible for coordinating development timelines, managing cloud resource allocation, monitoring operational expenses, and securing GitHub Student Developer Pack benefits for infrastructure support. |
 | **Myka Ella A. Dalit** | Infrastructure and Frontend contributor responsible for provisioning the Ubuntu virtual machine, configuring the Linux environment, assisting in deployment setup, and supporting frontend UI styling and responsiveness. |
 | **Arwin E. Eser Jose** | Backend Developer responsible for implementing API routing, request handling, middleware integration, and debugging backend logic related to file validation and user operations. |
 | **John Rei R. Tolentino** | Backend Developer responsible for Supabase database configuration, implementing logical quota enforcement mechanisms, and optimizing database queries and performance. |
