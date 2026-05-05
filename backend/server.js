@@ -99,38 +99,10 @@ new NodeClam().init({
     console.error("⚠️ ClamAV Failed to Initialize:", err.message);
 });
 
-// --- ANTI-MALWARE FILE FILTER ---
-const fileFilter = (req, file, cb) => {
-    // 1. Define strictly prohibited extensions (The Blacklist)
-    const blockedExtensions = ['.exe', '.sh', '.bat', '.cmd', '.msi', '.vbs', '.ps1', '.js', '.php'];
-    const fileExt = path.extname(file.originalname).toLowerCase();
-    
-    if (blockedExtensions.includes(fileExt)) {
-        return cb(new Error(`Security Violation: ${fileExt} files are strictly prohibited on this server.`), false);
-    }
-
-    // 2. Define strictly allowed MIME types (The Whitelist)
-    const allowedMimeTypes = [
-        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', // Images
-        'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // Docs
-        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // Spreadsheets
-        'text/plain', 'text/csv', // Text
-        'video/mp4', 'video/mpeg', 'video/quicktime', // Videos
-        'audio/mpeg', 'audio/wav', 'audio/ogg', // Audio
-        'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed' // Archives
-    ];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
-        cb(null, true); // Allow the upload
-    } else {
-        cb(new Error(`Security Violation: Unsupported file type (${file.mimetype}). Please upload a valid document, image, or media file.`), false);
-    }
-};
-
 // --- FILE UPLOAD SETUP (MULTER) ---
 const upload = multer({ 
     storage: storage,
-    fileFilter: fileFilter, // <-- Apply the new security filter!
+    // Removed the manual fileFilter! ClamAV handles the security now.
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit per individual file upload
 });
 
@@ -567,8 +539,18 @@ app.put('/api/admin/users/role', async (req, res) => {
     const { adminId, targetUserId, newRole } = req.body;
     if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
 
+    // 🛡️ SUPER ADMIN PROTECTION: Prevent demoting other Admins!
+    const { data: targetUser } = await supabase.from('profiles').select('role').eq('id', targetUserId).single();
+    if (targetUser?.role === 'admin' && newRole === 'user') {
+        logAudit(adminId, 'SECURITY_WARNING', `Attempted to unlawfully demote another Admin (ID: ${targetUserId})`, req);
+        return res.status(403).json({ error: "Permission Denied: You cannot demote another Administrator." });
+    }
+
     const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', targetUserId);
     if (error) return res.status(500).json({ error: "Failed to update role" });
+    
+    // 📝 WRITE TO AUDIT LOG!
+    logAudit(adminId, 'ROLE_CHANGED', `Changed user role to ${newRole.toUpperCase()}`, req);
     
     res.json({ message: `User is now an ${newRole}!` });
 });
@@ -639,23 +621,25 @@ app.delete('/api/admin/users/:userId', async (req, res) => {
     const targetUserId = req.params.userId;
     if (!(await verifyAdmin(adminId))) return res.status(403).json({ error: "Unauthorized" });
 
-    try {
-        // 1. Wipe their physical folder from the server's hard drive!
-        const targetFolder = path.join(uploadDir, targetUserId);
-        if (fs.existsSync(targetFolder)) {
-            fs.rmSync(targetFolder, { recursive: true, force: true });
-        }
+    // 🛡️ SUPER ADMIN PROTECTION: Prevent banning other Admins!
+    const { data: targetUser } = await supabase.from('profiles').select('role').eq('id', targetUserId).single();
+    if (targetUser?.role === 'admin') {
+        logAudit(adminId, 'SECURITY_WARNING', `Attempted to unlawfully BAN another Admin! (ID: ${targetUserId})`, req);
+        return res.status(403).json({ error: "Permission Denied: You cannot ban another Administrator." });
+    }
 
-        // 2. Delete them completely from Supabase (This automatically cascades and deletes their database rows too!)
+    try {
+        const targetFolder = path.join(uploadDir, targetUserId);
+        if (fs.existsSync(targetFolder)) fs.rmSync(targetFolder, { recursive: true, force: true });
+
         const { error } = await supabase.auth.admin.deleteUser(targetUserId);
         if (error) throw error;
 
-        // Log the Ban!
-        logAudit(adminId, 'USER_BANNED', `Admin banned and wiped user ID: ${targetUserId}`, req); // <-- ADD THIS
+        // 📝 WRITE TO AUDIT LOG!
+        logAudit(adminId, 'USER_BANNED', `Admin banned and wiped user ID: ${targetUserId}`, req);
 
         res.json({ message: "User and all their files have been wiped." });
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: "Failed to ban user." });
     }
 });

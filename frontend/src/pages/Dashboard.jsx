@@ -113,9 +113,13 @@ export default function Dashboard() {
     fetchContent(user.id, target.id);
   };
 
+  // 📂 NAVIGATE INTO FOLDER (With Double-Click Protection)
   const openFolder = (folder) => {
-    setBreadcrumbs([...breadcrumbs, { id: folder.id, name: folder.name }]);
+    // Stop the function if they are already inside this exact folder!
+    if (currentFolder === folder.id) return;
+    
     setCurrentFolder(folder.id);
+    setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
     fetchContent(user.id, folder.id);
   };
 

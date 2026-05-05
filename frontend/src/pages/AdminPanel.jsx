@@ -373,30 +373,43 @@ export default function AdminPanel() {
                         <td className="p-4 text-sm text-gray-600 dark:text-gray-300">{(u.storage_used / (1024 * 1024)).toFixed(2)} MB / {((u.max_storage || 1073741824) / (1024 * 1024 * 1024)).toFixed(0)} GB</td>
                         <td className="p-4 text-sm text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
                         <td className="p-4 flex justify-end items-center gap-3">
-                          {u.id !== adminUser.id && (
+                          {/* If the target is NOT an admin, show all moderation tools! */}
+                          {u.role !== 'admin' && (
                             <>
                               <select value={u.role} onChange={(e) => handleChangeRole(u.id, e.target.value)} className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer">
-                                <option value="user">User</option><option value="admin">Admin</option>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
                               </select>
-                              {/* 💾 STORAGE TIER DROPDOWN */}
-                              <select 
-                                value={u.max_storage || 1073741824} 
-                                onChange={(e) => handleUpgradeStorage(u.id, Number(e.target.value))} 
-                                className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer"
-                              >
-                                <option value={1073741824}>1 GB (Free)</option>
-                                <option value={5368709120}>5 GB (Pro)</option>
-                                <option value={16106127360}>15 GB (Max)</option>
+                              
+                              <select value={u.max_storage || 1073741824} onChange={(e) => handleUpgradeStorage(u.id, Number(e.target.value))} className="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-victus-accent cursor-pointer">
+                                <option value={1073741824}>1 GB</option>
+                                <option value={5368709120}>5 GB</option>
+                                <option value={16106127360}>15 GB</option>
                               </select>
+
                               <button onClick={() => handleWarnUser(u.id, u.full_name)} className="bg-yellow-100 dark:bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 hover:bg-yellow-500 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1">
                                 <ShieldAlert className="h-3 w-3" /> Warn
                               </button>
+                              
                               <button onClick={() => handleBanUser(u.id, u.full_name)} className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1">
                                 <Trash2 className="h-3 w-3" /> Ban & Wipe
                               </button>
                             </>
                           )}
-                          {u.id === adminUser.id && <span className="text-xs text-gray-500 italic px-3 py-1.5">You (Super Admin)</span>}
+
+                          {/* If the target IS an admin, protect them! */}
+                          {u.role === 'admin' && u.id !== adminUser.id && (
+                            <span className="text-xs font-bold text-red-500 bg-red-100 dark:bg-red-500/10 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-500/20">
+                              Protected Admin
+                            </span>
+                          )}
+
+                          {/* If it's YOU, show "You" */}
+                          {u.id === adminUser.id && (
+                            <span className="text-xs font-bold text-sky-500 bg-sky-100 dark:bg-sky-500/10 px-3 py-1.5 rounded-lg border border-sky-200 dark:border-sky-500/20">
+                              You (Super Admin)
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
