@@ -14,7 +14,7 @@
   </a>
   <img src="https://img.shields.io/badge/STATUS-PRODUCTION-16a34a?style=for-the-badge" />
   <img src="https://img.shields.io/badge/ARCHITECTURE-Stateful%20VPS-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/SECURITY-RLS%20%7C%20JWT-critical?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/SECURITY-RLS%20%7C%20ClamAV-critical?style=for-the-badge" />
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/LICENSE-MIT-yellow?style=for-the-badge" />
   </a>
@@ -35,7 +35,7 @@
 6. [API Reference](#-api-reference)
 7. [Production Deployment (VPS/Ubuntu)](#-production-deployment-vpsubuntu)
 8. [Team & Contributions](#-team--contributions)
-9. [Roadmap (v2.0)](#️-roadmap-v20)
+9. [Roadmap (v3.0)](#️-roadmap-v20)
 10. [License](#-license)
 
 ---
@@ -48,52 +48,53 @@ By deploying the system on a dedicated **Ubuntu 24.04 LTS virtual machine (Digit
 
 ### 🧠 Architectural Flow
 
-```
-Client (React Frontend)
+```text
+Client (React Frontend + Cloudflare Turnstile)
         ↓
-Node.js API (Express Backend)
+Node.js API (Express Backend + ClamAV Engine)
         ↓
-Supabase (Auth + PostgreSQL Metadata)
+Supabase (Auth + PostgreSQL Metadata + RLS)
         ↓
 Local Disk Storage (/var/www/uploads)
 ```
 
 ### 🔑 Key Architectural Decisions
 
-**1. Persistent Storage Layer**
-- Files are stored directly on the server filesystem at:
-  ```
-  /var/www/uploads
-  ```
-- Eliminates dependency on external storage APIs
-- Ensures data persistence across deployments and reboots
+1. Persistent Storage Layer  
+Files are stored directly on the server filesystem at /var/www/uploads.  
+Eliminates dependency on external storage APIs and ensures data persistence across deployments.
 
-**2. Hybrid Data Management Model**
-- **Database (Supabase PostgreSQL)** → metadata, authentication, quotas
-- **Filesystem** → binary file storage
+2. Virtual Filesystem (Nested Directories)  
+Emulates a traditional OS filesystem. Files remain flat on the physical Linux drive, but are mapped via parent_id relations in PostgreSQL, allowing infinite nested folder structures in the UI.
 
-**3. Logical Quota Enforcement**
-- Storage limits enforced at the application layer
-- Real-time validation before write operations
-- Prevents uncontrolled disk consumption
+3. Deep Security & Anti-Malware  
+Instead of relying solely on MIME-type restriction, the Node.js backend streams all uploads through a live ClamAV Daemon. Binary signatures are scanned heuristically before writing to the disk, permanently blocking embedded malware payloads.
 
-**4. Infrastructure Control**
-- Full control over OS-level configurations (Ubuntu kernel)
-- Vertical scalability (CPU, RAM, disk)
-- No cold starts or ephemeral resets
-
-This architecture results in a **predictable, cost-efficient, and production-reliable system**, aligning with real-world cloud deployment practices.
+4. Tiered Storage & Manual Payment Verification  
+Base users are restricted to 1GB. Users can request 5GB or 15GB upgrades by uploading GCash payment receipts via the platform. Admins verify the transaction in the God-Mode console, dynamically expanding the user's PostgreSQL quota and triggering an automated 30-day expiration timer.
 
 ---
 
 ## ✨ Core Features
 
-### 🛡️ Security & Authentication
-- Supabase Auth Integration for secure email/password authentication
-- Stateless JWT session handling
-- Row Level Security (RLS) enforcing strict per-user data isolation
-- File validation middleware (Multer) blocking executable payloads (`.exe`, `.sh`, `.bat`, `.msi`)
-- Nginx reverse proxy with SSL/TLS encryption via Let’s Encrypt
+### 🛡️ Enterprise Security
+Cloudflare Turnstile: Cryptographic bot mitigation preventing automated authentication brute-forcing.  
+Supabase Auth: Secure email/password authentication with stateless JWT session handling.  
+Row Level Security (RLS): Strict PostgreSQL policies enforcing per-user data isolation.  
+System Audit Logs: Immutable database logs tracking all blocked malware attempts, banned users, and security warnings.
+
+### 📂 Storage & Media System
+Cinematic Engine: Browser-native streaming of MP4 videos, PDF documents, and high-res images in a theater-style modal.  
+Smart Workspace: Drag-and-drop Dropzone, real-time client-side search filtering, and categorised views (Images/Docs/Media).  
+Personalization: Users can upload custom avatar pictures, rename files, and navigate via breadcrumbs.
+
+### 👑 God-Mode Admin Console
+Live Telemetry: Real-time monitoring of Linux CPU, RAM, and Disk space visualized via Recharts Area & Bar graphs.  
+Activity Heatmap: A GitHub-style contribution heatmap tracking the last 90 days of system upload activity.  
+Moderation Engine:  
+GCash Subscription Approvals  
+"Ban & Wipe" functionality (Recursively deletes user accounts and physically purges their Linux directories via fs.rmSync).  
+Send forced-acknowledgement "Warnings" that lock a user's screen upon login.
 
 ---
 
@@ -120,40 +121,21 @@ This architecture results in a **predictable, cost-efficient, and production-rel
 
 ---
 
-### 👑 Admin Console (System Telemetry & Controls)
+### 👑 Admin Console
 <p align="center">
   <img src="docs/screenshots/admin.png" width="800" />
 </p>
 
 ---
 
-### 📂 Storage & Media System
-- Persistent SSD-backed storage using direct filesystem writes
-- Browser-native streaming of MP4 videos, PDFs, and images
-- Drag-and-drop upload system using FormData APIs
-- Smooth UI transitions powered by Framer Motion
-- Real-time UI updates without full-page reloads
-
----
-
-### 👑 God-Mode Admin Console
-- Real-time system telemetry (CPU, RAM, disk usage) via `systeminformation`
-- Role-Based Access Control (RBAC) using JWT claims
-- Administrative capabilities:
-  - Global file inspection
-  - User promotion
-  - Recursive file deletion for malicious accounts
-
----
-
 ## 🛠️ Technology Stack
 
 | Domain | Technology Used |
-| :--- | :--- |
-| Frontend | React.js (Vite), Tailwind CSS, Framer Motion, React Dropzone, Lucide Icons |
-| Backend API | Node.js, Express.js, Multer, Helmet.js, CORS |
-| Database & Auth | Supabase (PostgreSQL), JWT, Custom SQL Triggers |
-| Infrastructure | DigitalOcean Droplet (Ubuntu 24.04 LTS), Nginx, PM2, Certbot (SSL) |
+|--------|---------------|
+| Frontend | React.js (Vite), Tailwind CSS, Framer Motion, Recharts, React Hot Toast, Lucide Icons |
+| Backend API | Node.js, Express.js, Multer, Clamscan (Anti-Virus Connector), Helmet.js, CORS |
+| Database & Auth | Supabase (PostgreSQL), JWT, Custom SQL Triggers, Stored RPC Functions |
+| Infrastructure | DigitalOcean (Ubuntu 24.04 LTS), Nginx, PM2, Certbot (SSL), ClamAV Daemon |
 
 ---
 
@@ -182,75 +164,41 @@ VictusG2-Documentation/
 │
 └── README.md
 ```
-
 ---
 
 ## ⚙️ Local Development Guide
 
-### 1. Prerequisites
-- Node.js (v18 or higher)
-- Git
-- Supabase account
+### 1. Environment Variables
 
----
-
-### 2. Database Configuration (Supabase)
-
-```sql
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users NOT NULL PRIMARY KEY,
-  email TEXT,
-  role TEXT DEFAULT 'user',
-  storage_used BIGINT DEFAULT 0
-);
-```
-
-Enable Row Level Security (RLS) after table creation.
-
----
-
-### 3. Environment Variables
-
-```bash
-git clone https://github.com/Amashing0411/VictusG2-Documentation.git
-cd VictusG2-Documentation
-```
-
-**Frontend (`frontend/.env`)**
+Frontend (`frontend/.env`)
 ```env
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_BASE_URL=http://localhost:5000/api
+VITE_TURNSTILE_SITE_KEY=your_cloudflare_site_key
+VITE_API_URL=http://localhost:5000
 ```
 
-**Backend (`backend/.env`)**
+Backend (`backend/.env`)
 ```env
 PORT=5000
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
-UPLOAD_DIR=./uploads
 ```
 
 ---
 
-### 4. Running the Application
+### 2. Running the Application
 
 ```bash
 # Backend
 cd backend
 npm install
-mkdir uploads
-npm start
+npm run dev
 
 # Frontend
 cd frontend
 npm install
 npm run dev
-```
-
-Application runs at:
-```
-http://localhost:5173
 ```
 
 ---
@@ -259,20 +207,20 @@ http://localhost:5173
 
 ### Authentication
 | Method | Endpoint | Description |
-|--------|--------|------------|
+|--------|----------|------------|
 | POST | `/api/auth/login` | Authenticate user |
 | POST | `/api/auth/register` | Register new user |
 
 ### File Management
 | Method | Endpoint | Description |
-|--------|--------|------------|
+|--------|----------|------------|
 | POST | `/api/upload` | Upload file |
 | GET | `/api/files` | Retrieve user files |
 | DELETE | `/api/files/:id` | Delete file |
 
 ### Admin
 | Method | Endpoint | Description |
-|--------|--------|------------|
+|--------|----------|------------|
 | GET | `/api/admin/stats` | System metrics |
 | POST | `/api/admin/promote` | Promote user |
 
@@ -280,46 +228,11 @@ http://localhost:5173
 
 ## 🌍 Production Deployment (VPS/Ubuntu)
 
-### Server Setup
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install nodejs npm git nginx -y
+sudo apt install nodejs npm git nginx python3-certbot-nginx -y
 sudo npm install -g pm2
-```
-
-### Deployment
-```bash
-cd /var/www
-git clone https://github.com/Amashing0411/VictusG2-Documentation.git victusg2
-
-cd victusg2/frontend
-npm install && npm run build
-
-cd ../backend
-npm install
-pm2 start server.js --name victus-api
-pm2 save
-pm2 startup
-```
-
-### Nginx Configuration
-```nginx
-server {
-    server_name victusg2.me www.victusg2.me;
-
-    location / {
-        root /var/www/victusg2/frontend/dist;
-        index index.html;
-        try_files $uri /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://localhost:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        client_max_body_size 1024M;
-    }
-}
+sudo apt install -y clamav clamav-daemon
 ```
 
 ---
@@ -340,20 +253,20 @@ Developed and maintained by **Group 2**.
 
 ---
 
-## 🗺️ Roadmap (v2.0)
+## 🗺️ Roadmap (v3.0)
 
-- TOTP-based Multi-Factor Authentication (MFA)
-- Secure file sharing with expiring public links
-- Nested directory system for hierarchical file organization
+Automated Payment Gateway  
+Large File Chunking  
+Secure File Sharing  
 
 ---
 
 ## 📜 License
 
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+This project is licensed under the MIT License.
 
 ---
 
 <p align="center">
-  <b>VictusG2 Cloud — A practical implementation of full-stack cloud infrastructure engineering.</b>
+<b>VictusG2 Cloud — A practical implementation of full-stack cloud infrastructure engineering.</b>
 </p>
