@@ -807,7 +807,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2"><Phone className="h-4 w-4"/> Phone Number</label>
-                      <input type="text" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="w-full bg-gray-50 dark:bg-victus-dark text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg py-2.5 px-4 focus:outline-none focus:border-victus-accent focus:ring-1 focus:ring-victus-accent" placeholder="+1 (555) 000-0000" />
+                      <input type="text" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="w-full bg-gray-50 dark:bg-victus-dark text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded-lg py-2.5 px-4 focus:outline-none focus:border-victus-accent focus:ring-1 focus:ring-victus-accent" placeholder="+639 00000 0000" />
                     </div>
                     <div className="pt-4 flex justify-end">
                       <button type="submit" disabled={savingProfile} className="bg-victus-accent hover:bg-sky-500 text-white py-2.5 px-6 rounded-lg font-medium transition-colors flex items-center gap-2">
